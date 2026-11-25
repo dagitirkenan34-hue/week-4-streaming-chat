@@ -1,0 +1,474 @@
+﻿HAFTA 4 - LLM KAVRAMLARI VE AI ENTEGRASYONLARI
+
+1. GÜN - GROQ STREAMING CHATBOT
+
+PROJE AMACI:
+Groq API kullanarak terminal üzerinden çalışan,
+yanıtları parça parça ekrana yazdıran bir AI chatbot geliştirmek.
+
+KULLANILAN TEKNOLOJİLER:
+- Python
+- Groq API
+- python-dotenv
+- Streaming
+- openai/gpt-oss-20b modeli
+
+ÇALIŞTIRMA:
+.\.venv\Scripts\python.exe main.py
+
+ÖNEMLİ:
+API anahtarı .env dosyasında tutulur.
+.env dosyası GitHub'a yüklenmemelidir.
+API anahtarı bu not dosyasına eklenmemelidir.
+
+MAIN.PY TAM KODU:
+----------------------------------------
+
+import os
+from dotenv import load_dotenv
+from groq import Groq, GroqError
+
+load_dotenv()
+
+API_KEY = os.getenv("GROQ_API_KEY")
+
+if not API_KEY:
+    raise ValueError("GROQ_API_KEY bulunamadı! .env dosyasını kontrol et.")
+
+client = Groq(api_key=API_KEY)
+
+MODEL = "openai/gpt-oss-20b"
+
+messages = [
+    {
+        "role": "system",
+        "content": "Sen yardımcı, açıklayıcı ve Türkçe konuşan bir AI mentorsun."
+    }
+]
+
+
+def chat(user_message: str) -> None:
+    messages.append({
+        "role": "user",
+        "content": user_message
+    })
+
+    print("\nAI: ", end="", flush=True)
+
+    try:
+        stream = client.chat.completions.create(
+            model=MODEL,
+            messages=messages,
+            temperature=0.7,
+            max_completion_tokens=1024,
+            stream=True
+        )
+
+        assistant_response = ""
+
+        for chunk in stream:
+            content = chunk.choices[0].delta.content
+
+            if content:
+                print(content, end="", flush=True)
+                assistant_response += content
+
+        print()
+
+        messages.append({
+            "role": "assistant",
+            "content": assistant_response
+        })
+
+    except GroqError as error:
+        print(f"\nGroq API hatası: {error}")
+        messages.pop()
+
+    if len(messages) > 11:
+        messages[:] = [messages[0]] + messages[-10:]
+
+
+def main():
+    print("=" * 45)
+    print("       AI MENTOR - GROQ STREAMING CHAT")
+    print("=" * 45)
+    print("Çıkmak için 'exit' yaz.\n")
+
+    while True:
+        user_message = input("Sen: ").strip()
+
+        if user_message.lower() in ["exit", "quit", "çık"]:
+            print("\nChatbot kapatılıyor. Görüşürüz!")
+            break
+
+        if not user_message:
+            continue
+
+        chat(user_message)
+
+
+if __name__ == "__main__":
+    main()
+
+
+
+========================================
+2. GÜN - XML PROMPT TEMPLATE (SQL UZMANI)
+========================================
+
+PROJE AMACI:
+XML formatında sistem talimatları hazırlayarak
+Groq AI modelini SQL uzmanı gibi çalıştırmak.
+
+KULLANILAN TEKNOLOJİLER:
+- Python
+- Groq API
+- XML Prompt
+- SQL
+- python-dotenv
+
+TEST:
+Kullanıcıları yaşlarına göre büyükten küçüğe sıralayan
+SQL sorgusu istendi. AI açıklama ve sorgu üretti.
+
+ÇALIŞTIRMA:
+.\.venv\Scripts\python.exe day2_xml_prompt.py
+
+DAY2_XML_PROMPT.PY TAM KODU:
+----------------------------------------
+
+from groq import Groq
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+api_key = os.getenv("GROQ_API_KEY")
+
+if not api_key:
+    raise ValueError("GROQ_API_KEY bulunamadı!")
+
+client = Groq(api_key=api_key)
+
+MODEL = "openai/gpt-oss-20b"
+
+
+def ask_sql_expert(question: str):
+    messages = [
+        {
+            "role": "system",
+            "content": """
+<instructions>
+    <role>Sen deneyimli bir SQL uzmanısın.</role>
+    <task>
+        Kullanıcının veritabanı sorusunu analiz et.
+        Uygun SQL sorgusunu üret ve açıkla.
+    </task>
+    <rules>
+        <rule>Yanıtlarını Türkçe ver.</rule>
+        <rule>SQL kodlarını markdown kod bloğunda göster.</rule>
+        <rule>Tablo ve kolon isimlerini açıkça belirt.</rule>
+        <rule>Bilgi eksikse varsayım yaptığını belirt.</rule>
+        <rule>Veri değiştiren sorgularda dikkatli ol ve önce açıklama yap.</rule>
+    </rules>
+    <output_format>
+        <section>Açıklama</section>
+        <section>SQL Sorgusu</section>
+        <section>Sorgunun Çalışma Mantığı</section>
+    </output_format>
+</instructions>
+"""
+        },
+        {
+            "role": "user",
+            "content": question
+        }
+    ]
+
+    response = client.chat.completions.create(
+        model=MODEL,
+        messages=messages,
+        temperature=0.3,
+        max_completion_tokens=1024
+    )
+
+    print("\nSQL UZMANI:")
+    print(response.choices[0].message.content)
+
+
+def main():
+    print("=" * 45)
+    print("       XML PROMPT - SQL UZMANI")
+    print("=" * 45)
+    print("Çıkmak için 'exit' yaz.\n")
+
+    while True:
+        question = input("Sorun: ").strip()
+
+        if question.lower() in ["exit", "quit", "çık"]:
+            print("Program kapatıldı.")
+            break
+
+        if question:
+            try:
+                ask_sql_expert(question)
+            except Exception as error:
+                print(f"API hatası: {error}")
+
+
+if __name__ == "__main__":
+    main()
+
+
+========================================
+3. GÜN - LANGCHAIN LCEL VE JSON OUTPUT
+========================================
+
+PROJE AMACI:
+LangChain kullanarak Groq modeline bağlanmak,
+LCEL zinciri oluşturmak ve yanıtları JSON formatında almak.
+
+KULLANILAN TEKNOLOJİLER:
+- Python
+- LangChain
+- LangChain Core
+- LangChain Groq
+- PromptTemplate
+- JsonOutputParser
+- LCEL
+
+LCEL ZİNCİRİ:
+PromptTemplate | ChatGroq | JsonOutputParser
+
+ÇALIŞTIRMA:
+.\.venv\Scripts\python.exe day3_lcel.py
+
+TEST:
+Python'da list ve tuple arasındaki farklar soruldu.
+AI, yanıtını JSON formatında başarıyla üretti.
+
+DAY3_LCEL.PY TAM KODU:
+----------------------------------------
+
+
+import os
+import json
+
+from dotenv import load_dotenv
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import JsonOutputParser
+from langchain_groq import ChatGroq
+
+load_dotenv()
+
+API_KEY = os.getenv("GROQ_API_KEY")
+
+if not API_KEY:
+    raise ValueError("GROQ_API_KEY bulunamadı! .env dosyasını kontrol et.")
+
+# Groq modelini LangChain'e bağlıyoruz.
+model = ChatGroq(
+    model="openai/gpt-oss-20b",
+    temperature=0.2,
+    api_key=API_KEY
+)
+
+# Model yanıtını JSON formatında ayrıştıracak parser.
+parser = JsonOutputParser()
+
+# Prompt şablonu.
+prompt = PromptTemplate(
+    template="""
+Sen yardımcı bir Python eğitmenisin.
+
+Kullanıcının sorusunu cevapla.
+Yanıtını aşağıdaki JSON formatında oluştur:
+
+{format_instructions}
+
+Kullanıcı sorusu: {question}
+""",
+    input_variables=["question"],
+    partial_variables={
+        "format_instructions": parser.get_format_instructions()
+    }
+)
+
+# LCEL zinciri: Prompt -> Model -> JSON Parser
+chain = prompt | model | parser
+
+
+def ask_question(question: str):
+    result = chain.invoke({
+        "question": question
+    })
+
+    print("\nAI YANITI:")
+    print(json.dumps(result, ensure_ascii=False, indent=4))
+
+
+def main():
+    print("=" * 45)
+    print("       LANGCHAIN LCEL - JSON CHAT")
+    print("=" * 45)
+    print("Çıkmak için 'exit' yaz.\n")
+
+    while True:
+        question = input("Sorun: ").strip()
+
+        if question.lower() in ["exit", "quit", "çık"]:
+            print("Program kapatıldı.")
+            break
+
+        if not question:
+            continue
+
+        try:
+            ask_question(question)
+        except Exception as error:
+            print(f"\nHata oluştu: {error}")
+
+
+if __name__ == "__main__":
+    main()
+
+
+========================================
+FINAL PROJESİ - FASTAPI STREAMING CHAT
+========================================
+
+Kullanılan teknolojiler:
+- Python
+- FastAPI
+- Uvicorn
+- Groq API
+- AsyncGroq
+- StreamingResponse
+- Pydantic
+- python-dotenv
+
+Proje özellikleri:
+- POST /chat endpoint'i oluşturuldu.
+- Groq bulut modeli entegre edildi.
+- Yanıtlar StreamingResponse ile parça parça gönderildi.
+- Kullanıcı bazlı konuşma geçmişi oluşturuldu.
+- Her kullanıcı için son 5 mesaj saklandı.
+- AsyncGroq ile asenkron API bağlantısı kuruldu.
+- Swagger üzerinden API testleri gerçekleştirildi.
+
+Test sonuçları:
+- GET / : Başarılı
+- POST /chat : HTTP 200
+- Streaming yanıt: Başarılı
+- Aynı kullanıcıyla hafıza testi: Başarılı
+- Farklı kullanıcıyla hafıza izolasyonu: Başarılı
+- Asenkron Groq testi: Başarılı
+
+API adresi:
+http://127.0.0.1:8000
+
+Swagger:
+http://127.0.0.1:8000/docs
+
+Not:
+Ollama yerel model entegrasyonu donanım kaynaklı
+çalıştırma sorunu nedeniyle test edilemedi.
+Yerel sağlayıcı final API'de devre dışı bırakıldı.
+
+
+========================================
+4. GÜN - OLLAMA VE YEREL AI MODELİ
+========================================
+
+PROJE AMACI:
+Ollama ile bilgisayarda yerel çalışan bir AI modeli kullanmak.
+LangChain ChatOllama aracılığıyla modele bağlanmak.
+
+KULLANILAN TEKNOLOJİLER:
+- Python
+- Ollama
+- Qwen2.5:3B
+- LangChain
+- ChatOllama
+- HumanMessage
+- SystemMessage
+
+MODEL:
+qwen2.5:3b
+
+ÇALIŞTIRMA:
+.\.venv\Scripts\python.exe day4_ollama.py
+
+KONTROL:
+ChatOllama Python bağlantısı başarıyla test edildi.
+
+NOT:
+Modelin gerçek yanıt testi henüz tamamlanmadı.
+Ollama llama-server 0xc0000005 hatası ve yüksek GPU sıcaklığı
+nedeniyle çalışma testi ertelendi.
+
+DAY4_OLLAMA.PY TAM KODU:
+----------------------------------------
+
+
+from langchain_ollama import ChatOllama
+from langchain_core.messages import HumanMessage, SystemMessage
+
+
+# Bilgisayarda çalışan yerel Ollama modeline bağlanıyoruz.
+model = ChatOllama(
+    model="qwen2.5:3b",
+    temperature=0.7
+)
+
+messages = [
+    SystemMessage(
+        content="Sen yardımcı, açıklayıcı ve Türkçe konuşan bir AI asistansın."
+    )
+]
+
+
+def chat(question: str):
+    messages.append(HumanMessage(content=question))
+
+    try:
+        response = model.invoke(messages)
+
+        print("\nYEREL AI:")
+        print(response.content)
+
+        messages.append(response)
+
+        # Son konuşmaları hafızada tut.
+        if len(messages) > 11:
+            messages[:] = [messages[0]] + messages[-10:]
+
+    except Exception as error:
+        print(f"\nOllama bağlantı hatası: {error}")
+        messages.pop()
+
+
+def main():
+    print("=" * 45)
+    print("       OLLAMA - YEREL AI CHAT")
+    print("=" * 45)
+    print("Model: qwen2.5:3b")
+    print("Çıkmak için 'exit' yaz.\n")
+
+    while True:
+        question = input("Sen: ").strip()
+
+        if question.lower() in ["exit", "quit", "çık"]:
+            print("\nYerel AI kapatılıyor.")
+            break
+
+        if question:
+            chat(question)
+
+
+if __name__ == "__main__":
+    main()
+
+
+========================================
+
